@@ -28,3 +28,9 @@ floxtodon.dev {
 		reverse_proxy 127.0.0.1:3000
 	}
 }
+
+# www → apex. Mastodon identities are tied to LOCAL_DOMAIN (floxtodon.dev),
+# so www only redirects; Caddy still gets it its own certificate.
+www.floxtodon.dev {
+	redir https://floxtodon.dev{uri} permanent
+}
