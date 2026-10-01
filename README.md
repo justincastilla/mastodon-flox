@@ -64,6 +64,86 @@ Mastodon is a **free, open-source social network server** based on [ActivityPub]
 
 This repository includes deployment configurations for **Docker and docker-compose**, as well as for other environments like Heroku and Scalingo. For Helm charts, reference the [mastodon/chart repository](https://github.com/mastodon/chart). A [**standalone** installation guide](https://docs.joinmastodon.org/admin/install/) is available in the main documentation.
 
+## Developing with Flox
+
+[![Flox Environment](https://github.com/justincastilla/mastodon-flox/actions/workflows/flox.yml/badge.svg)](https://github.com/justincastilla/mastodon-flox/actions/workflows/flox.yml)
+
+This fork adds a [Flox](https://flox.dev) environment that sets up Mastodon's whole development stack with one command: Ruby, Node, PostgreSQL, Redis, the native media libraries, and every app process. You don't need Docker, a dev container, rbenv/nvm, Homebrew, or `apt-get`.
+
+### Quick start
+
+1. [Install Flox](https://flox.dev/docs/install-flox/install).
+2. Clone the repo and start everything:
+
+   ```sh
+   git clone https://github.com/justincastilla/mastodon-flox.git
+   cd mastodon-flox
+   flox activate --start-services
+   ```
+
+3. Open <http://localhost:3000> and log in as `admin@localhost` with password `mastodonadmin`. This is the development seed account.
+
+The first activation installs gems and node packages and creates a local PostgreSQL cluster. It takes a few minutes. After that, activation is close to instant.
+
+### What you get
+
+| Component                                     | Version               | Pinned by                                     |
+| --------------------------------------------- | --------------------- | --------------------------------------------- |
+| Ruby                                          | 4.0.6                 | `.ruby-version`                               |
+| Node.js                                       | 24.19.0               | `.nvmrc`                                      |
+| Yarn                                          | 4.18.0                | `packageManager` in `package.json` (corepack) |
+| PostgreSQL                                    | 14                    | `docker-compose.yml`                          |
+| Redis                                         | 8 (see note below)    | `docker-compose.yml`                          |
+| libvips, FFmpeg, ICU, libidn, OpenSSL, `file` | from the Flox catalog | `Dockerfile`, `Aptfile`, `Gemfile`            |
+
+Flox installs system-level tools. Bundler and Yarn still own the Ruby and JavaScript dependencies. The environment's activation hook runs `bundle install` and `yarn install` for you, and only when the lockfiles change.
+
+### Services
+
+`flox activate --start-services` (or `flox services start` inside an activated shell) runs the same processes as `Procfile.dev`, plus the datastores:
+
+| Service     | What it runs                                             | Address                  |
+| ----------- | -------------------------------------------------------- | ------------------------ |
+| `postgres`  | PostgreSQL 14, unix socket only                          | `/tmp/mastodon-postgres` |
+| `redis`     | Redis                                                    | `localhost:6379`         |
+| `web`       | Puma (Rails). Runs `rails db:prepare` first, then serves | <http://localhost:3000>  |
+| `sidekiq`   | Background jobs                                          | —                        |
+| `streaming` | Node streaming API                                       | `localhost:4000`         |
+| `vite`      | Frontend dev server with hot reload                      | `localhost:3036`         |
+
+Database setup is automatic. On first start, `web` runs `bin/rails db:prepare`, which creates the database, loads the schema and seeds the admin account. On later starts it only applies pending migrations. `sidekiq` and `streaming` wait until the schema exists before they start.
+
+Useful commands:
+
+```sh
+flox services status          # what's running
+flox services logs web -f     # follow one service's logs
+flox services restart web     # restart after changing config
+flox services stop            # stop everything
+```
+
+All state lives in `.flox/cache/`, which git ignores: the PostgreSQL data, the gems and the corepack cache. To start over from an empty database, stop the services and delete `.flox/cache/postgres`.
+
+### Platform support
+
+| Platform                      | Supported |
+| ----------------------------- | --------- |
+| Linux x86_64                  | ✅        |
+| Linux aarch64                 | ✅        |
+| macOS Apple Silicon (aarch64) | ✅        |
+| macOS Intel (x86_64)          | ❌        |
+
+**Intel Macs are excluded on purpose.** The Flox catalog has no `x86_64-darwin` builds of `ruby_4_0`, `nodejs_24` at the pinned version, or several of the native libraries (vips, ffmpeg, icu, libidn, openssl, file). The manifest's `options.systems` therefore leaves that platform out, and activation would fail there anyway. On an Intel Mac, use the Docker or dev container setup instead.
+
+CI checks all three supported platforms on every push. The [Flox Environment workflow](.github/workflows/flox.yml) builds the environment from scratch, boots every service and health-checks web and streaming.
+
+### Notes and known differences
+
+- **Redis 8 in development, Redis 7 in production.** `docker-compose.yml` uses `redis:7-alpine`, but the environment runs the catalog's Redis 8. Pinning 7.x left the package group unresolvable alongside the other pins. Mastodon requires Redis 7.0 or newer, and Redis 8 is backward compatible with the 7.x commands it relies on, so this is fine for development. If you add Redis-specific code, test it against 7 as well.
+- **macOS and `LD_LIBRARY_PATH`.** macOS System Integrity Protection strips `DYLD_*` variables from scripts launched through `/usr/bin/env`, like `bin/rails` and `bin/dev`. The hook sets `LD_LIBRARY_PATH` so `ruby-vips` can still find libvips through ffi.
+- **Optional services are not included.** Elasticsearch (full-text search) and LibreTranslate (translations) live in `.devcontainer/compose.yaml` and stay optional. Run them with Docker if you need those features.
+- The environment is defined in [`.flox/env/manifest.toml`](.flox/env/manifest.toml). Every package has a comment recording why it is there and where its version comes from.
+
 ## Contributing
 
 Mastodon is **free, open-source software** licensed under **AGPLv3**. We welcome contributions and help from anyone who wants to improve the project.

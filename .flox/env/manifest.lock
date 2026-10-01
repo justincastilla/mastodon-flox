@@ -6,6 +6,9 @@
       "ffmpeg": {
         "pkg-path": "ffmpeg"
       },
+      "file": {
+        "pkg-path": "file"
+      },
       "gcc": {
         "pkg-path": "gcc"
       },
@@ -73,7 +76,7 @@
       "REDIS_URL": "redis://localhost:6379"
     },
     "hook": {
-      "on-activate": "  # --- Keep Ruby gems inside the env cache, never in the repo tree or ~/.gem ---\n  export GEM_HOME=\"$FLOX_ENV_CACHE/bundle\"\n  export BUNDLE_PATH=\"$FLOX_ENV_CACHE/bundle\"\n  export PATH=\"$GEM_HOME/bin:$PATH\"\n\n  # --- PostgreSQL cluster under the cache; socket dir is $DB_HOST ---\n  export PGDATA=\"$FLOX_ENV_CACHE/postgres\"\n  mkdir -p \"$DB_HOST\"\n  if [ ! -d \"$PGDATA\" ]; then\n    echo \"→ initializing PostgreSQL cluster (one time)\" >&2\n    initdb -D \"$PGDATA\" --username=\"$DB_USER\" --auth=trust --no-locale --encoding=UTF8 >/dev/null\n  fi\n\n  # --- Redis state under the cache ---\n  mkdir -p \"$FLOX_ENV_CACHE/redis\"\n\n  # --- macOS: SIP strips DYLD_* from anything launched through /usr/bin/env (bin/rails, bin/dev) ---\n  # ruby-vips loads libvips via ffi at runtime; ffi's macOS fallback search honors LD_LIBRARY_PATH,\n  # which SIP leaves alone. (2026-09-14: without this, `bin/rails db:setup` failed with\n  # \"Could not open library 'vips.42'\" while `bundle exec rails db:setup` worked.)\n  case \"$(uname -s)\" in\n    Darwin) export LD_LIBRARY_PATH=\"$FLOX_ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" ;;\n  esac\n\n  # --- Ruby deps (Gemfile) — idempotent ---\n  bundle check >/dev/null 2>&1 || bundle install\n\n  # --- Yarn: exact packageManager version (yarn@4.18.0) via corepack, kept in the env cache ---\n  export COREPACK_HOME=\"$FLOX_ENV_CACHE/corepack\"\n  mkdir -p \"$COREPACK_HOME\" \"$FLOX_ENV_CACHE/node-bin\"\n  corepack enable --install-directory \"$FLOX_ENV_CACHE/node-bin\" yarn\n  export PATH=\"$FLOX_ENV_CACHE/node-bin:$PATH\"\n\n  # --- Node deps: yarn workspaces cover the root app + streaming/ ---\n  if [ ! -d node_modules ] || [ yarn.lock -nt node_modules ]; then\n    yarn install --immutable\n  fi\n\n  echo \"Ready. 'flox services start' (or 'flox activate -s') brings up postgres, redis, web, sidekiq, streaming and vite.\" >&2\n  echo \"First run only: 'bin/rails db:setup' before starting the app services.\" >&2\n"
+      "on-activate": "  # --- Keep Ruby gems inside the env cache, never in the repo tree or ~/.gem ---\n  export GEM_HOME=\"$FLOX_ENV_CACHE/bundle\"\n  export BUNDLE_PATH=\"$FLOX_ENV_CACHE/bundle\"\n  export PATH=\"$GEM_HOME/bin:$PATH\"\n\n  # --- PostgreSQL cluster under the cache; socket dir is $DB_HOST ---\n  export PGDATA=\"$FLOX_ENV_CACHE/postgres\"\n  mkdir -p \"$DB_HOST\"\n  if [ ! -d \"$PGDATA\" ]; then\n    echo \"→ initializing PostgreSQL cluster (one time)\" >&2\n    initdb -D \"$PGDATA\" --username=\"$DB_USER\" --auth=trust --no-locale --encoding=UTF8 >/dev/null\n  fi\n\n  # --- Redis state under the cache ---\n  mkdir -p \"$FLOX_ENV_CACHE/redis\"\n\n  # --- macOS: SIP strips DYLD_* from anything launched through /usr/bin/env (bin/rails, bin/dev) ---\n  # ruby-vips loads libvips via ffi at runtime; ffi's macOS fallback search honors LD_LIBRARY_PATH,\n  # which SIP leaves alone. (2026-09-14: without this, `bin/rails db:setup` failed with\n  # \"Could not open library 'vips.42'\" while `bundle exec rails db:setup` worked.)\n  case \"$(uname -s)\" in\n    Darwin) export LD_LIBRARY_PATH=\"$FLOX_ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" ;;\n  esac\n\n  # --- Ruby deps (Gemfile) — idempotent ---\n  bundle check >/dev/null 2>&1 || bundle install\n\n  # --- Yarn: exact packageManager version (yarn@4.18.0) via corepack, kept in the env cache ---\n  export COREPACK_HOME=\"$FLOX_ENV_CACHE/corepack\"\n  mkdir -p \"$COREPACK_HOME\" \"$FLOX_ENV_CACHE/node-bin\"\n  corepack enable --install-directory \"$FLOX_ENV_CACHE/node-bin\" yarn\n  export PATH=\"$FLOX_ENV_CACHE/node-bin:$PATH\"\n\n  # --- Node deps: yarn workspaces cover the root app + streaming/ ---\n  if [ ! -d node_modules ] || [ yarn.lock -nt node_modules ]; then\n    yarn install --immutable\n  fi\n\n  echo \"Ready. 'flox services start' (or 'flox activate -s') brings up postgres, redis, web, sidekiq, streaming and vite.\" >&2\n  echo \"The database is created/migrated automatically on first start (bin/rails db:prepare in the web service).\" >&2\n"
     },
     "options": {
       "systems": [
@@ -90,10 +93,10 @@
         "command": "  exec redis-server --port 6379 --unixsocket /tmp/mastodon-redis.sock --dir \"$FLOX_ENV_CACHE/redis\" --save \"\" --appendonly no\n"
       },
       "sidekiq": {
-        "command": "  exec bundle exec sidekiq\n"
+        "command": "  until psql -h \"$DB_HOST\" -p \"$DB_PORT\" -U \"$DB_USER\" -d \"$DB_NAME\" -tAc \"SELECT 1 FROM schema_migrations LIMIT 1\" >/dev/null 2>&1; do sleep 1; done\n  until redis-cli -u \"$REDIS_URL\" ping >/dev/null 2>&1; do sleep 0.5; done\n  exec bundle exec sidekiq\n"
       },
       "streaming": {
-        "command": "  exec yarn workspace @mastodon/streaming start\n",
+        "command": "  until psql -h \"$DB_HOST\" -p \"$DB_PORT\" -U \"$DB_USER\" -d \"$DB_NAME\" -tAc \"SELECT 1 FROM schema_migrations LIMIT 1\" >/dev/null 2>&1; do sleep 1; done\n  until redis-cli -u \"$REDIS_URL\" ping >/dev/null 2>&1; do sleep 0.5; done\n  exec yarn workspace @mastodon/streaming start\n",
         "vars": {
           "PORT": "4000"
         }
@@ -102,7 +105,7 @@
         "command": "  exec yarn dev\n"
       },
       "web": {
-        "command": "  exec bundle exec puma -C config/puma.rb\n",
+        "command": "  until pg_isready -h \"$DB_HOST\" -p \"$DB_PORT\" -q; do sleep 0.5; done\n  until redis-cli -u \"$REDIS_URL\" ping >/dev/null 2>&1; do sleep 0.5; done\n  bundle exec rails db:prepare\n  exec bundle exec puma -C config/puma.rb\n",
         "vars": {
           "PORT": "3000"
         }
@@ -214,6 +217,105 @@
         "lib": "/nix/store/vw6jkg2ilvhhdab70a6hg0pmjw91sf8a-ffmpeg-9.0.1-lib",
         "man": "/nix/store/l03z4qnhp6h76icam2p8vzqxnw55vyrb-ffmpeg-9.0.1-man",
         "out": "/nix/store/z1madanw8x9gbcxqvv2xwliim63wfh7x-ffmpeg-9.0.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "file",
+      "broken": false,
+      "derivation": "/nix/store/c1h9s7k8hp9idk2vqd2rlhpgwfl2d7cr-file-5.48.drv",
+      "description": "Program that shows the type of files",
+      "install_id": "file",
+      "license": "BSD-2-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d2f67949798825fe853f7c5d0492b8bf016d3f88",
+      "name": "file-5.48",
+      "pname": "file",
+      "rev": "d2f67949798825fe853f7c5d0492b8bf016d3f88",
+      "rev_count": 1064150,
+      "rev_date": "2026-08-29T21:32:09Z",
+      "scrape_date": "2026-08-31T04:56:52.377505Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.48",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/2qg7w2yk2j56lmc66p463yd13hiw15v8-file-5.48-dev",
+        "man": "/nix/store/7d2n952x93rgdjkww9kq39kz24lrwz25-file-5.48-man",
+        "out": "/nix/store/d3h1q2d5sxdawj4s5wjj7bqxw3pr9f38-file-5.48"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "file",
+      "broken": false,
+      "derivation": "/nix/store/hy5fzc180nip2h8k964v5aw4gx2z9zj0-file-5.48.drv",
+      "description": "Program that shows the type of files",
+      "install_id": "file",
+      "license": "BSD-2-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d2f67949798825fe853f7c5d0492b8bf016d3f88",
+      "name": "file-5.48",
+      "pname": "file",
+      "rev": "d2f67949798825fe853f7c5d0492b8bf016d3f88",
+      "rev_count": 1064150,
+      "rev_date": "2026-08-29T21:32:09Z",
+      "scrape_date": "2026-08-31T05:29:11.361117Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.48",
+      "outputs_to_install": [
+        "man",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/v8plbdhhs30r33s9v2hg8zhngz08h6q9-file-5.48-dev",
+        "man": "/nix/store/pv1k8rfhgr1gxsj3j1ll1c57vqa76rq3-file-5.48-man",
+        "out": "/nix/store/p8sybzwxa2mpvnrgrn2xpimy1wkcmkcd-file-5.48"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "file",
+      "broken": false,
+      "derivation": "/nix/store/jnhmj9slwk930r4rkpck2xrdak8xdm0m-file-5.48.drv",
+      "description": "Program that shows the type of files",
+      "install_id": "file",
+      "license": "BSD-2-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d2f67949798825fe853f7c5d0492b8bf016d3f88",
+      "name": "file-5.48",
+      "pname": "file",
+      "rev": "d2f67949798825fe853f7c5d0492b8bf016d3f88",
+      "rev_count": 1064150,
+      "rev_date": "2026-08-29T21:32:09Z",
+      "scrape_date": "2026-08-31T06:07:47.104341Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.48",
+      "outputs_to_install": [
+        "man",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/v2z7kwphiqxdx91rhzbrxizz1gn3758a-file-5.48-dev",
+        "man": "/nix/store/zj4afabr5c57b7l71212zw4pc9jmf21x-file-5.48-man",
+        "out": "/nix/store/ykrpgmrrdm7w22dykziy6l61ic6i1d3w-file-5.48"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
@@ -502,6 +604,7 @@
       "unfree": false,
       "version": "78.3",
       "outputs_to_install": [
+        "out",
         "out",
         "out",
         "out",
