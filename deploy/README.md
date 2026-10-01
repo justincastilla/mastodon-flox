@@ -70,7 +70,7 @@ Create your admin account. The generated password is printed only to your termin
 
 ```sh
 gcloud compute ssh floxtodon --zone us-west1-c -- \
-  "sudo -u mastodon bash -c 'cd ~/live && flox activate -d deploy/server -c \"bin/tootctl accounts create USERNAME --email YOU@example.com --confirmed --role Owner\"'"
+  "sudo -u mastodon bash -c 'cd ~/live && flox activate -d deploy/server -c \"bin/tootctl accounts create USERNAME --email YOU@example.com --confirmed --approve --role Owner\"'"
 ```
 
 ## Day to day

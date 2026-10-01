@@ -14,7 +14,7 @@ nodejs.pkg-path = "nodejs_24" # .nvmrc 24.19 · Dockerfile NODE_MAJOR_VERSION=24
 nodejs.version = "24.19.0" # exact match to .nvmrc 24.19
 
 # --- Package managers ---
-# yarn: package.json pins packageManager "yarn@4.18.0". Catalog yarn-berry tops out at 4.14.1 and
+# yarn: package.json pins packageManager "yarn@4.18.1". Catalog yarn-berry tops out at 4.14.1 and
 # 2026-09-14 `yarn install` with 4.14.1 failed on yarn.lock's builtin typescript@7.0.2 patch
 # (ENOENT lstat node_modules/typescript/lib/_tsc.js) — a lockfile written by a newer Yarn.
 # No .yarn/releases/ is vendored, so the exact version is provisioned via corepack (bundled
@@ -107,7 +107,7 @@ on-activate = '''
   # --- Ruby deps (Gemfile) — idempotent ---
   bundle check >/dev/null 2>&1 || bundle install
 
-  # --- Yarn: exact packageManager version (yarn@4.18.0) via corepack, kept in the env cache ---
+  # --- Yarn: exact packageManager version (yarn@4.18.1) via corepack, kept in the env cache ---
   export COREPACK_HOME="$FLOX_ENV_CACHE/corepack"
   mkdir -p "$COREPACK_HOME" "$FLOX_ENV_CACHE/node-bin"
   corepack enable --install-directory "$FLOX_ENV_CACHE/node-bin" yarn
