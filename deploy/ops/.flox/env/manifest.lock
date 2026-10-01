@@ -1,0 +1,103 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "schema-version": "1.17.0",
+    "install": {
+      "google-cloud-sdk": {
+        "pkg-path": "google-cloud-sdk"
+      }
+    },
+    "hook": {},
+    "profile": {},
+    "options": {}
+  },
+  "packages": [
+    {
+      "attr_path": "google-cloud-sdk",
+      "broken": false,
+      "derivation": "/nix/store/irjj7g65sk7ah4qf3y5vvq8cf0qfgw1w-google-cloud-sdk-583.0.0.drv",
+      "description": "Tools for the google cloud platform",
+      "install_id": "google-cloud-sdk",
+      "license": "Unspecified free software license",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7a0f122f5090cf4c2ade2a13a0e229d4e19ba71f",
+      "name": "google-cloud-sdk-583.0.0",
+      "pname": "google-cloud-sdk",
+      "rev": "7a0f122f5090cf4c2ade2a13a0e229d4e19ba71f",
+      "rev_count": 1080855,
+      "rev_date": "2026-09-28T06:58:16Z",
+      "scrape_date": "2026-09-29T04:58:29.141058Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "583.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/w5ci1fj4f1y1c3kf5mfvj6s6fdi62hrm-google-cloud-sdk-583.0.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "google-cloud-sdk",
+      "broken": false,
+      "derivation": "/nix/store/l81z07122m7gyf3p3hdrdw01gvx02p4i-google-cloud-sdk-583.0.0.drv",
+      "description": "Tools for the google cloud platform",
+      "install_id": "google-cloud-sdk",
+      "license": "Unspecified free software license",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7a0f122f5090cf4c2ade2a13a0e229d4e19ba71f",
+      "name": "google-cloud-sdk-583.0.0",
+      "pname": "google-cloud-sdk",
+      "rev": "7a0f122f5090cf4c2ade2a13a0e229d4e19ba71f",
+      "rev_count": 1080855,
+      "rev_date": "2026-09-28T06:58:16Z",
+      "scrape_date": "2026-09-29T05:30:03.108213Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "583.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5cicq4wvl1vjg9nyrsd9kbixsn366klv-google-cloud-sdk-583.0.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "google-cloud-sdk",
+      "broken": false,
+      "derivation": "/nix/store/8z7vf9h44qlvmc7fynjb6mdd3m67v7xv-google-cloud-sdk-583.0.0.drv",
+      "description": "Tools for the google cloud platform",
+      "install_id": "google-cloud-sdk",
+      "license": "Unspecified free software license",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7a0f122f5090cf4c2ade2a13a0e229d4e19ba71f",
+      "name": "google-cloud-sdk-583.0.0",
+      "pname": "google-cloud-sdk",
+      "rev": "7a0f122f5090cf4c2ade2a13a0e229d4e19ba71f",
+      "rev_count": 1080855,
+      "rev_date": "2026-09-28T06:58:16Z",
+      "scrape_date": "2026-09-29T06:06:03.732666Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "583.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/hlgjjzj64asxvcja4ibjmqdhkzsmlkbl-google-cloud-sdk-583.0.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    }
+  ]
+}
