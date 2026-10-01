@@ -111,3 +111,39 @@ body::before {
   z-index: 10000;
   pointer-events: none;
 }
+
+/*
+ * Replace Mastodon's wordmark with the Flox "F" symbol + "floxtodon".
+ * The symbol is a CSS mask filled with currentColor, so it is white on dark
+ * themes and black on light themes, per the logo guidelines. The footer still
+ * credits Mastodon ("Mastodon: About · View source code").
+ */
+a:has(> svg.logo--wordmark) {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+a:has(> svg.logo--wordmark) > svg.logo--wordmark {
+  display: none;
+}
+
+a:has(> svg.logo--wordmark)::before {
+  content: '';
+  flex: none;
+  width: 21px;
+  height: 28px;
+  background-color: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 40'%3E%3Crect y='30.002' width='9.99999' height='10'/%3E%3Crect x='10' y='20' width='20' height='10'/%3E%3Cpath d='M9.84374 0H30V10L9.99999 20H0V10L9.84374 0Z'/%3E%3C/svg%3E")
+    no-repeat center / contain;
+}
+
+a:has(> svg.logo--wordmark)::after {
+  content: 'floxtodon';
+  font-family: var(--font-body);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
