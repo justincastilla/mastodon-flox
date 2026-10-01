@@ -91,7 +91,7 @@ The first activation installs gems and node packages and creates a local Postgre
 | --------------------------------------------- | --------------------- | --------------------------------------------- |
 | Ruby                                          | 4.0.6                 | `.ruby-version`                               |
 | Node.js                                       | 24.19.0               | `.nvmrc`                                      |
-| Yarn                                          | 4.18.0                | `packageManager` in `package.json` (corepack) |
+| Yarn                                          | 4.18.1                | `packageManager` in `package.json` (corepack) |
 | PostgreSQL                                    | 14                    | `docker-compose.yml`                          |
 | Redis                                         | 8 (see note below)    | `docker-compose.yml`                          |
 | libvips, FFmpeg, ICU, libidn, OpenSSL, `file` | from the Flox catalog | `Dockerfile`, `Aptfile`, `Gemfile`            |
