@@ -1,0 +1,105 @@
+name: Flox Environment
+
+# Proves the Flox environment (.flox/env/manifest.toml) builds from scratch and
+# boots the full Mastodon stack — postgres, redis, web, sidekiq, streaming and
+# vite — on every platform the manifest supports, with no Docker and no
+# system packages beyond Flox itself.
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flox:
+    name: ${{ matrix.system }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            system: x86_64-linux
+          - os: ubuntu-24.04-arm
+            system: aarch64-linux
+          - os: macos-latest
+            system: aarch64-darwin
+          # x86_64-darwin (Intel macOS) is intentionally absent: the manifest
+          # excludes it because ruby_4_0, nodejs_24 and several native
+          # libraries have no x86_64-darwin build in the Flox catalog.
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install Flox
+        uses: flox/install-flox-action@1128abd73431089ab9d871c893b4e72a729354e1 # v2.6.0
+
+      - name: Cache gems and node_modules
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            .flox/cache/bundle
+            .flox/cache/corepack
+            node_modules
+            streaming/node_modules
+          key: flox-${{ matrix.system }}-${{ hashFiles('.flox/env/manifest.lock', 'Gemfile.lock', 'yarn.lock') }}
+
+      - name: Activate environment (bundle install + yarn install via hook)
+        run: |
+          flox activate -c '
+            set -e
+            ruby --version
+            node --version
+            yarn --version
+            bundle --version
+            psql --version
+            redis-server --version
+            vips --version
+            ffmpeg -version | head -1
+            file --version | head -1
+            bundle exec ruby -e "%w[vips charlock_holmes idn pg].each { |g| require g }; puts \"native gems OK\""
+          '
+
+      - name: Boot the full stack and health-check it
+        run: |
+          flox activate --start-services -c '
+            fail() {
+              echo "::error::$1"
+              flox services status
+              for s in postgres redis web sidekiq streaming vite; do
+                echo "::group::$s logs"; flox services logs "$s" 2>&1 | tail -80; echo "::endgroup::"
+              done
+              exit 1
+            }
+
+            # web runs `rails db:prepare` on first start (create + schema + seeds)
+            for i in $(seq 1 150); do curl -sf localhost:3000/health >/dev/null && break; sleep 2; done
+            curl -sf localhost:3000/health >/dev/null || fail "web never became healthy"
+            echo "web /health: OK"
+
+            for i in $(seq 1 60); do curl -sf localhost:4000/api/v1/streaming/health >/dev/null && break; sleep 2; done
+            curl -sf localhost:4000/api/v1/streaming/health >/dev/null || fail "streaming never became healthy"
+            echo "streaming /health: OK"
+
+            code=$(curl -s -o /dev/null -w "%{http_code}" localhost:3000/about)
+            [ "$code" = "200" ] || fail "GET /about returned $code"
+            echo "GET /about: 200"
+
+            migrations=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT count(*) FROM schema_migrations")
+            [ "$migrations" -gt 0 ] || fail "database has no migrations"
+            echo "schema_migrations: $migrations"
+
+            for i in $(seq 1 30); do flox services status | grep -q "sidekiq *Running" && break; sleep 2; done
+            flox services status
+            flox services status | grep -q "sidekiq *Running" || fail "sidekiq is not running"
+
+            flox services stop
+          '

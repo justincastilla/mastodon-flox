@@ -30,7 +30,9 @@ postgresql.outputs = [
 ] # default is out+man only; pg gem needs pg_config (out) + libpq (lib) + headers (dev)
 redis.pkg-path = "redis" # docker-compose.yml redis image redis:7-alpine
 # redis.version pin dropped 2026-09-14: with `redis.version = "7.2.7"`, `flox activate` failed
-# ("constraints for group 'toplevel' are too tight"); catalog default is 8.x, compose pins redis:7
+# ("constraints for group 'toplevel' are too tight"); catalog default is 8.x, compose pins redis:7.
+# Known discrepancy: dev runs Redis 8, production/compose runs 7. Mastodon needs >= 7.0 and Redis 8
+# is backward compatible with 7.x commands, so this is fine for development — see README "Developing with Flox".
 
 # --- Native media libraries (runtime + gem C-extensions) ---
 vips.pkg-path = "vips" # Gemfile ruby-vips ~> 2.2 · Dockerfile VIPS_VERSION=8.18.5 (catalog 8.18.6 newest; group resolved 8.18.5)
@@ -62,6 +64,9 @@ libidn.outputs = [
 pkg-config.pkg-path = "pkg-config" # extconf.rb library discovery
 gcc.pkg-path = "gcc" # C compiler for gem extensions
 gnumake.pkg-path = "gnumake" # make for gem extensions
+
+# --- Runtime CLI tools ---
+file.pkg-path = "file" # Dockerfile installs `file`; Paperclip uses it for upload MIME detection (don't rely on the host having it)
 
 [vars]
 # Literal strings only — no shell interpolation here.
@@ -114,7 +119,7 @@ on-activate = '''
   fi
 
   echo "Ready. 'flox services start' (or 'flox activate -s') brings up postgres, redis, web, sidekiq, streaming and vite." >&2
-  echo "First run only: 'bin/rails db:setup' before starting the app services." >&2
+  echo "The database is created/migrated automatically on first start (bin/rails db:prepare in the web service)." >&2
 '''
 
 [services.postgres]
@@ -130,8 +135,15 @@ command = '''
 '''
 
 # --- Application processes, ported from Procfile.dev (what bin/dev hands to foreman/overmind) ---
+# Flox services have no dependency ordering, so each app service waits for what it needs.
+# web owns database setup: `bin/rails db:prepare` (what bin/setup runs) creates, loads the
+# schema and seeds on first start, and only runs pending migrations after that.
+# sidekiq and streaming wait until that schema exists before starting.
 [services.web]
 command = '''
+  until pg_isready -h "$DB_HOST" -p "$DB_PORT" -q; do sleep 0.5; done
+  until redis-cli -u "$REDIS_URL" ping >/dev/null 2>&1; do sleep 0.5; done
+  bundle exec rails db:prepare
   exec bundle exec puma -C config/puma.rb
 '''
 [services.web.vars]
@@ -139,11 +151,15 @@ PORT = "3000"
 
 [services.sidekiq]
 command = '''
+  until psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT 1 FROM schema_migrations LIMIT 1" >/dev/null 2>&1; do sleep 1; done
+  until redis-cli -u "$REDIS_URL" ping >/dev/null 2>&1; do sleep 0.5; done
   exec bundle exec sidekiq
 '''
 
 [services.streaming]
 command = '''
+  until psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT 1 FROM schema_migrations LIMIT 1" >/dev/null 2>&1; do sleep 1; done
+  until redis-cli -u "$REDIS_URL" ping >/dev/null 2>&1; do sleep 0.5; done
   exec yarn workspace @mastodon/streaming start
 '''
 [services.streaming.vars]
