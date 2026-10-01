@@ -1,0 +1,30 @@
+# floxtodon.dev — Caddy in front of Mastodon. The Caddy equivalent of dist/nginx.conf.
+# Caddy obtains and renews the Let's Encrypt certificate automatically
+# and redirects HTTP to HTTPS.
+
+floxtodon.dev {
+	encode zstd gzip
+
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains"
+
+	# Streaming API (Node, services.streaming)
+	handle /api/v1/streaming* {
+		reverse_proxy 127.0.0.1:4000
+	}
+
+	# Precompiled assets and other static files from public/
+	@static file {
+		root {$MASTODON_ROOT}/public
+	}
+	handle @static {
+		root * {$MASTODON_ROOT}/public
+		@cacheable path /assets/* /packs/* /avatars/* /emoji/* /headers/* /sounds/* /ocr/*
+		header @cacheable Cache-Control "public, max-age=2419200, must-revalidate"
+		file_server
+	}
+
+	# Everything else: Rails (puma, services.web)
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}

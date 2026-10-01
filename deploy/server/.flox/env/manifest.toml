@@ -1,0 +1,154 @@
+schema-version = "1.17.0"
+#
+# Production environment for floxtodon.dev — Mastodon on a single VM.
+#
+# Same toolchain as the development environment at the repo root
+# (.flox/env/manifest.toml), plus Caddy for HTTPS. Every process — postgres,
+# redis, puma, sidekiq, streaming and caddy — runs as a Flox service; systemd
+# only supervises one `flox activate --start-services` (deploy/server/floxtodon.service).
+#
+# Secrets are NOT here: they live in the repo root's .env.production on the
+# server (git-ignored), which Rails and the streaming server both load.
+
+[install]
+# --- Language runtimes (same pins as the dev environment) ---
+ruby.pkg-path = "ruby_4_0"
+ruby.version = "4.0.6" # .ruby-version
+nodejs.pkg-path = "nodejs_24"
+nodejs.version = "24.19.0" # .nvmrc
+
+# --- Datastores ---
+postgresql.pkg-path = "postgresql_14" # docker-compose.yml postgres:14
+postgresql.outputs = [
+  "out",
+  "lib",
+  "dev",
+] # pg gem needs pg_config + libpq + headers
+redis.pkg-path = "redis" # see README: Redis 8 here, compose uses 7
+
+# --- Native media + C-extension gem dependencies (see dev manifest for details) ---
+vips.pkg-path = "vips"
+vips.outputs = ["out", "bin", "dev"]
+ffmpeg.pkg-path = "ffmpeg"
+openssl.pkg-path = "openssl"
+openssl.outputs = ["out", "dev"]
+icu.pkg-path = "icu"
+icu.outputs = ["out", "dev"]
+libidn.pkg-path = "libidn"
+libidn.outputs = ["out", "dev"]
+pkg-config.pkg-path = "pkg-config"
+gcc.pkg-path = "gcc"
+gnumake.pkg-path = "gnumake"
+file.pkg-path = "file"
+
+# --- Production only ---
+caddy.pkg-path = "caddy" # reverse proxy + automatic Let's Encrypt HTTPS
+
+[vars]
+RAILS_ENV = "production"
+NODE_ENV = "production"
+# All persistent state (database, redis, TLS certificates) lives here, outside the repo.
+DATA_DIR = "/var/lib/floxtodon"
+# Postgres listens on a unix socket only; peer auth maps the OS user `mastodon` to the DB role.
+DB_HOST = "/var/lib/floxtodon/run"
+DB_PORT = "5432"
+DB_USER = "mastodon"
+DB_NAME = "mastodon_production"
+REDIS_URL = "redis://127.0.0.1:6379"
+# Sized for an e2-small (2 GB RAM + swap): one puma worker, five sidekiq threads.
+WEB_CONCURRENCY = "1"
+MAX_THREADS = "5"
+STREAMING_CLUSTER_NUM = "1"
+# aws-sdk-s3 >= 1.178 adds CRC checksums that Google Cloud Storage's S3 API rejects.
+AWS_REQUEST_CHECKSUM_CALCULATION = "when_required"
+AWS_RESPONSE_CHECKSUM_VALIDATION = "when_required"
+
+[hook]
+on-activate = '''
+  # The Mastodon checkout is two levels up from deploy/server.
+  export MASTODON_ROOT="$(cd "$FLOX_ENV_PROJECT/../.." && pwd)"
+
+  # Gems in the env cache, production groups only.
+  export GEM_HOME="$FLOX_ENV_CACHE/bundle"
+  export BUNDLE_PATH="$FLOX_ENV_CACHE/bundle"
+  export BUNDLE_GEMFILE="$MASTODON_ROOT/Gemfile"
+  export BUNDLE_DEPLOYMENT=true
+  export BUNDLE_WITHOUT="development:test"
+  export PATH="$GEM_HOME/bin:$PATH"
+
+  # Yarn at the exact packageManager version, via corepack.
+  export COREPACK_HOME="$FLOX_ENV_CACHE/corepack"
+  export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+  mkdir -p "$COREPACK_HOME" "$FLOX_ENV_CACHE/node-bin"
+  corepack enable --install-directory "$FLOX_ENV_CACHE/node-bin" yarn
+  export PATH="$FLOX_ENV_CACHE/node-bin:$PATH"
+
+  # Caddy keeps its certificates under DATA_DIR so they survive redeploys.
+  export XDG_DATA_HOME="$DATA_DIR/caddy-data"
+  export XDG_CONFIG_HOME="$DATA_DIR/caddy-config"
+
+  # Persistent state directories and one-time database cluster.
+  export PGDATA="$DATA_DIR/postgres"
+  mkdir -p "$DB_HOST" "$DATA_DIR/redis" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
+  if [ ! -d "$PGDATA" ]; then
+    echo "→ initializing PostgreSQL cluster (one time)" >&2
+    initdb -D "$PGDATA" --username="$DB_USER" --auth-local=peer --auth-host=scram-sha-256 \
+      --no-locale --encoding=UTF8 >/dev/null
+  fi
+
+  # Dependencies — idempotent, fast when nothing changed.
+  (cd "$MASTODON_ROOT" && { bundle check >/dev/null 2>&1 || bundle install --quiet; })
+  (cd "$MASTODON_ROOT" && { [ -d node_modules ] && [ ! yarn.lock -nt node_modules ] || yarn install --immutable; })
+'''
+
+[services.postgres]
+command = '''
+  exec postgres -D "$PGDATA" -k "$DB_HOST" -p "$DB_PORT" -c listen_addresses=""
+'''
+
+[services.redis]
+command = '''
+  exec redis-server --bind 127.0.0.1 --port 6379 --dir "$DATA_DIR/redis" --appendonly yes
+'''
+
+# Flox services have no dependency ordering, so app services wait for their datastores.
+[services.web]
+command = '''
+  cd "$MASTODON_ROOT"
+  until pg_isready -h "$DB_HOST" -p "$DB_PORT" -q; do sleep 0.5; done
+  until redis-cli -u "$REDIS_URL" ping >/dev/null 2>&1; do sleep 0.5; done
+  bundle exec rails db:prepare
+  exec bundle exec puma -C config/puma.rb
+'''
+[services.web.vars]
+BIND = "127.0.0.1"
+PORT = "3000"
+
+[services.sidekiq]
+command = '''
+  cd "$MASTODON_ROOT"
+  until psql -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -tAc "SELECT 1 FROM schema_migrations LIMIT 1" >/dev/null 2>&1; do sleep 1; done
+  until redis-cli -u "$REDIS_URL" ping >/dev/null 2>&1; do sleep 0.5; done
+  exec bundle exec sidekiq -c 5
+'''
+[services.sidekiq.vars]
+DB_POOL = "5"
+
+[services.streaming]
+command = '''
+  cd "$MASTODON_ROOT"
+  until psql -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -tAc "SELECT 1 FROM schema_migrations LIMIT 1" >/dev/null 2>&1; do sleep 1; done
+  until redis-cli -u "$REDIS_URL" ping >/dev/null 2>&1; do sleep 0.5; done
+  exec node ./streaming/index.js
+'''
+[services.streaming.vars]
+BIND = "127.0.0.1"
+PORT = "4000"
+
+[services.caddy]
+command = '''
+  exec caddy run --config "$FLOX_ENV_PROJECT/Caddyfile" --adapter caddyfile
+'''
+
+[options]
+systems = ["x86_64-linux", "aarch64-linux"]
