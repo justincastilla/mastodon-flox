@@ -29,7 +29,7 @@ systemd ─▶ flox activate -d deploy/server --start-services
               └── caddy      (:80/:443 → streaming / static files / puma)
 ```
 
-The production environment pins the same Ruby 4.0.6 and Node 24.19.0 as development.
+The production environment pins the same Ruby 4.0.9 and Node 24.21.0 as development.
 Persistent state lives in `/var/lib/floxtodon`, outside the checkout. Secrets live in
 `.env.production` (mode 600, git-ignored), which is generated on the server.
 
@@ -90,3 +90,12 @@ An e2-small has 2 GB RAM. The environment runs one Puma worker (`WEB_CONCURRENCY
 and five Sidekiq threads, and `provision.sh` adds 4 GB of swap for asset builds. To
 grow, stop the VM, change its machine type, then start it again. The disk, IP and data
 are unaffected.
+
+## Updating package versions
+
+Flox needs a FloxHub login (`flox auth login`) to resolve packages, and the server
+isn't logged in. So change versions on your own machine and commit the result: edit
+`deploy/server/.flox/env/manifest.toml`, then run `flox list -d deploy/server` to
+re-resolve `manifest.lock` (this works from a Mac even though the environment is
+Linux-only), and commit both files. The server only builds from the committed lock,
+which needs no login.

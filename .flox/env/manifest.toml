@@ -8,10 +8,10 @@ schema-version = "1.14.0"
 
 [install]
 # --- Language runtimes ---
-ruby.pkg-path = "ruby_4_0" # .ruby-version 4.0.6 · Gemfile.lock RUBY VERSION 4.0.6 · Dockerfile RUBY_VERSION=4.0.6
-ruby.version = "4.0.6" # exact match in catalog (Gemfile allows >= 3.3.0, < 4.1.0)
+ruby.pkg-path = "ruby_4_0" # .ruby-version 4.0.9 · Dockerfile RUBY_VERSION=4.0.9
+ruby.version = "4.0.9" # .ruby-version 4.0.9 (v4.7.4 security release); exact match in catalog
 nodejs.pkg-path = "nodejs_24" # .nvmrc 24.19 · Dockerfile NODE_MAJOR_VERSION=24 · package.json engines.node ">=22"
-nodejs.version = "24.19.0" # exact match to .nvmrc 24.19
+nodejs.version = "24.21.0" # .nvmrc says 24.19, but upstream's production image floats node:24 (= 24.21) for Node security fixes cited in v4.7.4; match that
 
 # --- Package managers ---
 # yarn: package.json pins packageManager "yarn@4.18.1". Catalog yarn-berry tops out at 4.14.1 and
@@ -171,7 +171,7 @@ command = '''
 '''
 
 [options]
-# x86_64-darwin excluded: ruby_4_0@4.0.6, nodejs_24@24.19.0, postgresql_14@14.24, redis,
+# x86_64-darwin excluded: ruby_4_0@4.0.9, nodejs_24@24.21.0, postgresql_14@14.24, redis,
 # vips, ffmpeg, icu, libidn, openssl and gcc all lack an x86_64-darwin build (confirmed via `flox show`),
 # so the environment cannot activate on Intel macOS regardless.
 systems = ["x86_64-linux", "aarch64-linux", "aarch64-darwin"]

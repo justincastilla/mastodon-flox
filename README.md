@@ -89,8 +89,8 @@ The first activation installs gems and node packages and creates a local Postgre
 
 | Component                                     | Version               | Pinned by                                     |
 | --------------------------------------------- | --------------------- | --------------------------------------------- |
-| Ruby                                          | 4.0.6                 | `.ruby-version`                               |
-| Node.js                                       | 24.19.0               | `.nvmrc`                                      |
+| Ruby                                          | 4.0.9                 | `.ruby-version`                               |
+| Node.js                                       | 24.21.0               | latest 24.x (`.nvmrc` lags at 24.19)          |
 | Yarn                                          | 4.18.1                | `packageManager` in `package.json` (corepack) |
 | PostgreSQL                                    | 14                    | `docker-compose.yml`                          |
 | Redis                                         | 8 (see note below)    | `docker-compose.yml`                          |
