@@ -13,9 +13,9 @@ schema-version = "1.17.0"
 [install]
 # --- Language runtimes (same pins as the dev environment) ---
 ruby.pkg-path = "ruby_4_0"
-ruby.version = "4.0.6" # .ruby-version
+ruby.version = "4.0.9" # .ruby-version (v4.7.4)
 nodejs.pkg-path = "nodejs_24"
-nodejs.version = "24.19.0" # .nvmrc
+nodejs.version = "24.21.0" # latest 24.x, like upstream's node:24 image (Node security fixes; .nvmrc lags at 24.19)
 
 # --- Datastores ---
 postgresql.pkg-path = "postgresql_14" # docker-compose.yml postgres:14
