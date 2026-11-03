@@ -81,8 +81,12 @@ REDIS_URL = "redis://localhost:6379"
 [hook]
 on-activate = '''
   # --- Keep Ruby gems inside the env cache, never in the repo tree or ~/.gem ---
-  export GEM_HOME="$FLOX_ENV_CACHE/bundle"
-  export BUNDLE_PATH="$FLOX_ENV_CACHE/bundle"
+  # One gem directory per Ruby version: native extensions (openssl, pg, nokogiri, ...)
+  # link against the exact libruby, so a Ruby upgrade must rebuild them rather than
+  # reuse gems compiled for the old build ("linked to incompatible libruby").
+  FLOX_RUBY_VERSION="$(ruby -e 'print RUBY_VERSION')"
+  export GEM_HOME="$FLOX_ENV_CACHE/bundle/$FLOX_RUBY_VERSION"
+  export BUNDLE_PATH="$FLOX_ENV_CACHE/bundle/$FLOX_RUBY_VERSION"
   export PATH="$GEM_HOME/bin:$PATH"
 
   # --- PostgreSQL cluster under the cache; socket dir is $DB_HOST ---
@@ -102,6 +106,14 @@ on-activate = '''
   # "Could not open library 'vips.42'" while `bundle exec rails db:setup` worked.)
   case "$(uname -s)" in
     Darwin) export LD_LIBRARY_PATH="$FLOX_ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+  esac
+
+  # --- macOS: build charlock_holmes against Flox's ICU, not Homebrew's ---
+  # Its extconf.rb prepends `brew --prefix icu4c` on darwin. With Homebrew's icu4c installed
+  # (GitHub macOS runners, many dev Macs) it links Homebrew's ICU but loads Flox's, failing with
+  # "symbol not found ... icu_78::ByteSink" (2026-11-03). --with-icu-dir overrides that lookup.
+  case "$(uname -s)" in
+    Darwin) export BUNDLE_BUILD__CHARLOCK_HOLMES="--with-icu-dir=$FLOX_ENV" ;;
   esac
 
   # --- Ruby deps (Gemfile) — idempotent ---
