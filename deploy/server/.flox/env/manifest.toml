@@ -69,8 +69,12 @@ on-activate = '''
   export MASTODON_ROOT="$(cd "$FLOX_ENV_PROJECT/../.." && pwd)"
 
   # Gems in the env cache, production groups only.
-  export GEM_HOME="$FLOX_ENV_CACHE/bundle"
-  export BUNDLE_PATH="$FLOX_ENV_CACHE/bundle"
+  # One gem directory per Ruby version: native extensions (openssl, pg, nokogiri, ...)
+  # link against the exact libruby, so a Ruby upgrade must rebuild them rather than
+  # reuse gems compiled for the old build ("linked to incompatible libruby").
+  FLOX_RUBY_VERSION="$(ruby -e 'print RUBY_VERSION')"
+  export GEM_HOME="$FLOX_ENV_CACHE/bundle/$FLOX_RUBY_VERSION"
+  export BUNDLE_PATH="$FLOX_ENV_CACHE/bundle/$FLOX_RUBY_VERSION"
   export BUNDLE_GEMFILE="$MASTODON_ROOT/Gemfile"
   export BUNDLE_DEPLOYMENT=true
   export BUNDLE_WITHOUT="development:test"

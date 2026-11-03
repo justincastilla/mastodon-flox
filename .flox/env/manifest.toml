@@ -81,8 +81,12 @@ REDIS_URL = "redis://localhost:6379"
 [hook]
 on-activate = '''
   # --- Keep Ruby gems inside the env cache, never in the repo tree or ~/.gem ---
-  export GEM_HOME="$FLOX_ENV_CACHE/bundle"
-  export BUNDLE_PATH="$FLOX_ENV_CACHE/bundle"
+  # One gem directory per Ruby version: native extensions (openssl, pg, nokogiri, ...)
+  # link against the exact libruby, so a Ruby upgrade must rebuild them rather than
+  # reuse gems compiled for the old build ("linked to incompatible libruby").
+  FLOX_RUBY_VERSION="$(ruby -e 'print RUBY_VERSION')"
+  export GEM_HOME="$FLOX_ENV_CACHE/bundle/$FLOX_RUBY_VERSION"
+  export BUNDLE_PATH="$FLOX_ENV_CACHE/bundle/$FLOX_RUBY_VERSION"
   export PATH="$GEM_HOME/bin:$PATH"
 
   # --- PostgreSQL cluster under the cache; socket dir is $DB_HOST ---
