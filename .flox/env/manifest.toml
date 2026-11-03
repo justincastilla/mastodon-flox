@@ -108,6 +108,14 @@ on-activate = '''
     Darwin) export LD_LIBRARY_PATH="$FLOX_ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
   esac
 
+  # --- macOS: build charlock_holmes against Flox's ICU, not Homebrew's ---
+  # Its extconf.rb prepends `brew --prefix icu4c` on darwin. With Homebrew's icu4c installed
+  # (GitHub macOS runners, many dev Macs) it links Homebrew's ICU but loads Flox's, failing with
+  # "symbol not found ... icu_78::ByteSink" (2026-11-03). --with-icu-dir overrides that lookup.
+  case "$(uname -s)" in
+    Darwin) export BUNDLE_BUILD__CHARLOCK_HOLMES="--with-icu-dir=$FLOX_ENV" ;;
+  esac
+
   # --- Ruby deps (Gemfile) — idempotent ---
   bundle check >/dev/null 2>&1 || bundle install
 
