@@ -9,7 +9,9 @@ floxtodon.dev {
 
 	# Streaming API (Node, services.streaming)
 	handle /api/v1/streaming* {
-		reverse_proxy 127.0.0.1:4000
+		reverse_proxy 127.0.0.1:4000 {
+			header_up -Forwarded
+		}
 	}
 
 	# Precompiled assets and other static files from public/
@@ -24,8 +26,12 @@ floxtodon.dev {
 	}
 
 	# Everything else: Rails (puma, services.web)
+	# Caddy sets X-Forwarded-For itself, but would pass a client-supplied `Forwarded`
+	# header through; drop it so it can't spoof the client IP (GHSA-qp4r-p842-mw5c).
 	handle {
-		reverse_proxy 127.0.0.1:3000
+		reverse_proxy 127.0.0.1:3000 {
+			header_up -Forwarded
+		}
 	}
 }
 
