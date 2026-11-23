@@ -29,7 +29,7 @@ systemd ─▶ flox activate -d deploy/server --start-services
               └── caddy      (:80/:443 → streaming / static files / puma)
 ```
 
-The production environment pins the same Ruby 4.0.9 and Node 24.21.0 as development.
+The production environment pins the same Ruby 4.0.10 and Node 24.22.2 as development.
 Persistent state lives in `/var/lib/floxtodon`, outside the checkout. Secrets live in
 `.env.production` (mode 600, git-ignored), which is generated on the server.
 

@@ -8,10 +8,10 @@ schema-version = "1.14.0"
 
 [install]
 # --- Language runtimes ---
-ruby.pkg-path = "ruby_4_0" # .ruby-version 4.0.9 · Dockerfile RUBY_VERSION=4.0.9
-ruby.version = "4.0.9" # .ruby-version 4.0.9 (v4.7.4 security release); exact match in catalog
+ruby.pkg-path = "ruby_4_0" # .ruby-version 4.0.10 · Dockerfile RUBY_VERSION=4.0.10
+ruby.version = "4.0.10" # .ruby-version 4.0.10 (v4.7.6 security release); exact match in catalog
 nodejs.pkg-path = "nodejs_24" # .nvmrc 24.19 · Dockerfile NODE_MAJOR_VERSION=24 · package.json engines.node ">=22"
-nodejs.version = "24.21.0" # .nvmrc says 24.19, but upstream's production image floats node:24 (= 24.21) for Node security fixes cited in v4.7.4; match that
+nodejs.version = "24.22.2" # .nvmrc says 24.19, but upstream's production image floats node:24 (latest 24.x) for Node security fixes; match that
 
 # --- Package managers ---
 # yarn: package.json pins packageManager "yarn@4.18.1". Catalog yarn-berry tops out at 4.14.1 and
@@ -22,7 +22,12 @@ nodejs.version = "24.21.0" # .nvmrc says 24.19, but upstream's production image 
 # bundler ships with ruby_4_0 (Gemfile.lock BUNDLED WITH 4.0.18 — bundler self-upgrades into GEM_HOME if needed)
 
 # --- Datastores (both hard runtime deps; wired as [services.*] below) ---
+# 2026-11-23: `flox list` failed ("constraints for group 'toplevel' are too tight") with
+# ruby_4_0@4.0.10 + postgresql_14 in one group: PostgreSQL 14 is EOL (Nov 2026) and is absent
+# from catalog pages new enough for Ruby 4.0.10. Its own group keeps 14.x resolvable; the pg gem
+# links its libpq across groups (stable C ABI). Follow-up: upgrade to PostgreSQL 16/17.
 postgresql.pkg-path = "postgresql_14" # docker-compose.yml db image postgres:14-alpine · also builds the pg gem (Gemfile pg ~> 1.5)
+postgresql.pkg-group = "postgresql"
 postgresql.outputs = [
   "out",
   "lib",
@@ -183,7 +188,7 @@ command = '''
 '''
 
 [options]
-# x86_64-darwin excluded: ruby_4_0@4.0.9, nodejs_24@24.21.0, postgresql_14@14.24, redis,
+# x86_64-darwin excluded: ruby_4_0@4.0.10, nodejs_24@24.22.2, postgresql_14@14.24, redis,
 # vips, ffmpeg, icu, libidn, openssl and gcc all lack an x86_64-darwin build (confirmed via `flox show`),
 # so the environment cannot activate on Intel macOS regardless.
 systems = ["x86_64-linux", "aarch64-linux", "aarch64-darwin"]
